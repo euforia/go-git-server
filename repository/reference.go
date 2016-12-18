@@ -1,4 +1,4 @@
-package gitserver
+package repository
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
-//  RepositoryHead contains the HEAD ref and hash information
+// RepositoryHead contains the HEAD ref and hash information
 type RepositoryHead struct {
 	Ref  string        `json:"ref"`
 	Hash plumbing.Hash `json:"hash"`
@@ -18,7 +18,7 @@ type RepositoryHead struct {
 // RepositoryReferences contains repo refs and head information.
 type RepositoryReferences struct {
 	mu    sync.Mutex
-	Head  RepositoryHead
+	head  RepositoryHead
 	Heads map[string]plumbing.Hash
 	Tags  map[string]plumbing.Hash
 }
@@ -27,10 +27,60 @@ type RepositoryReferences struct {
 // the defaults.
 func NewRepositoryReferences() *RepositoryReferences {
 	return &RepositoryReferences{
-		Head:  RepositoryHead{Ref: "heads/master", Hash: plumbing.Hash{}},
+		head:  RepositoryHead{Ref: "heads/master", Hash: plumbing.Hash{}},
 		Heads: map[string]plumbing.Hash{"master": plumbing.Hash{}},
 		Tags:  map[string]plumbing.Hash{},
 	}
+}
+
+// Head returns the current pointed HEAD
+func (refs *RepositoryReferences) Head() RepositoryHead {
+	return refs.head
+}
+
+// UpdateRef updates a repo reference given the previous hash of the ref.
+func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash) error {
+	s := strings.Split(ref, "/")
+	s = s[1:]
+
+	refs.mu.Lock()
+	defer refs.mu.Unlock()
+
+	switch s[0] {
+	case "heads":
+
+		v, ok := refs.Heads[s[1]]
+		if !ok {
+			return fmt.Errorf("ref not found: %s", ref)
+		}
+
+		if v.String() == prev.String() {
+			refs.Heads[s[1]] = curr
+			break
+		}
+
+		return fmt.Errorf("previous hash mismatch: %s != %s", v.String(), prev.String())
+
+	case "tags":
+
+		v, ok := refs.Tags[s[1]]
+		if !ok {
+			return fmt.Errorf("ref not found: %s", ref)
+		}
+
+		if v.String() == prev.String() {
+			refs.Tags[s[1]] = curr
+			break
+		}
+
+		return fmt.Errorf("previous hash mismatch: %s != %s", v.String(), prev.String())
+
+	default:
+		return fmt.Errorf("invalid ref: %s", ref)
+
+	}
+
+	return nil
 }
 
 // MarshalJSON is a custom json marshaller for the repository specifically to handle
@@ -38,8 +88,8 @@ func NewRepositoryReferences() *RepositoryReferences {
 func (refs *RepositoryReferences) MarshalJSON() ([]byte, error) {
 	out := map[string]interface{}{
 		"head": map[string]string{
-			"ref":  refs.Head.Ref,
-			"hash": refs.Head.Hash.String(),
+			"ref":  refs.head.Ref,
+			"hash": refs.head.Hash.String(),
 		},
 	}
 	heads := map[string]string{}
@@ -70,41 +120,17 @@ func (refs *RepositoryReferences) SetHead(ref string) (plumbing.Hash, error) {
 	switch tr[0] {
 	case "tags":
 		if h, ok := refs.Tags[tr[1]]; ok {
-			refs.Head = RepositoryHead{Hash: h, Ref: ref}
+			refs.head = RepositoryHead{Hash: h, Ref: ref}
 			return h, nil
 		}
 
 	case "heads":
 		if h, ok := refs.Heads[tr[1]]; ok {
-			refs.Head = RepositoryHead{Hash: h, Ref: ref}
+			refs.head = RepositoryHead{Hash: h, Ref: ref}
 			return h, nil
 		}
 
 	}
 
 	return plumbing.Hash{}, fmt.Errorf("invalid ref: %s", ref)
-}
-
-// Repository represents a single repo.
-type Repository struct {
-	ID   string                `json:"id"`
-	Refs *RepositoryReferences `json:"refs"`
-	// sha256 hash of the binary data from the store.  This is stored upon
-	// retreival and used as the previous hash when trying to update.
-	hash [32]byte
-}
-
-// NewRepository instantiates an empty repo.
-func NewRepository(id string) *Repository {
-	return &Repository{ID: id, Refs: NewRepositoryReferences()}
-}
-
-// Hash of the repo as seen by the datastore.  This is used as the previous hash
-// to issue any updates back to the datastore.
-func (repo *Repository) Hash() [32]byte {
-	return repo.hash
-}
-
-func (repo *Repository) String() string {
-	return repo.ID
 }

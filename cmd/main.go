@@ -2,9 +2,11 @@ package main
 
 import (
 	"log"
-	"net/http"
+
+	"gopkg.in/src-d/go-git.v4/storage/memory"
 
 	"github.com/euforia/go-git-server"
+	"github.com/euforia/go-git-server/repository"
 )
 
 var (
@@ -16,12 +18,14 @@ func init() {
 }
 
 func main() {
-	gh := gitserver.NewGitServer()
-	router := gitserver.NewRouter(gh)
-	router.Default = gh.HandleRepository
+	repostore := repository.NewMemRepoStore()
+	objstore := memory.NewStorage()
 
-	log.Printf("HTTP Server: http://%s", httpAddr)
-	if err := http.ListenAndServe(httpAddr, router); err != nil {
+	gh := gitserver.NewGitHTTPService(repostore, objstore)
+	rh := gitserver.NewRepoHTTPService(repostore)
+
+	router := gitserver.NewRouter(gh, rh, nil)
+	if err := router.Serve(httpAddr); err != nil {
 		log.Println(err)
 	}
 }

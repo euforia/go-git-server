@@ -44,7 +44,7 @@ func (dec *Decoder) Decode() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("%d Header: type=%s length=%d offset=%d", i+1, header.Type, header.Length, header.Offset)
+		//log.Printf("%d Header: type=%s length=%d offset=%d", i+1, header.Type, header.Length, header.Offset)
 
 		var obj plumbing.EncodedObject
 

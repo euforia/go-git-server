@@ -1,9 +1,17 @@
-package gitserver
+package repository
 
 import (
 	"fmt"
 	"sync"
 )
+
+// RepositoryStore is the repository storage interface that should be implemented.
+type RepositoryStore interface {
+	GetRepo(string) (*Repository, error)
+	CreateRepo(*Repository) error
+	UpdateRepo(*Repository) error
+	RemoveRepo(string) error
+}
 
 // MemRepoStore is a memory based repo datastore
 type MemRepoStore struct {
@@ -46,4 +54,16 @@ func (mrs *MemRepoStore) UpdateRepo(repo *Repository) error {
 		return nil
 	}
 	return fmt.Errorf("repo not found: %s", repo.ID)
+}
+
+// RemoveRepo with the given id
+func (mrs *MemRepoStore) RemoveRepo(id string) error {
+	mrs.mu.Lock()
+	defer mrs.mu.Unlock()
+
+	if _, ok := mrs.m[id]; ok {
+		delete(mrs.m, id)
+		return nil
+	}
+	return fmt.Errorf("repo not found: %s", id)
 }
