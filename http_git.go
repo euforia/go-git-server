@@ -84,5 +84,4 @@ func (svr *GitHTTPService) UploadPack(w http.ResponseWriter, r *http.Request) {
 
 	proto := NewProtocol(w, r.Body)
 	proto.UploadPack(svr.store)
-	//UploadPack(w, r.Body, svr.store)
 }

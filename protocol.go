@@ -62,7 +62,7 @@ func (proto *Protocol) ListReferences(service GitServiceType, refs *repository.R
 	}
 
 	// Send HEAD info
-	head := refs.Head()
+	head := refs.Head
 
 	lh := append([]byte(fmt.Sprintf("%s HEAD", head.Hash.String())), '\x00')
 	lh = append(lh, capabilities()...)
@@ -94,7 +94,7 @@ func (proto *Protocol) UploadPack(store storer.EncodedObjectStorer) ([]byte, err
 		return nil, err
 	}
 
-	log.Printf("[upload-pack] wants=%d haves=%d", len(wants), len(haves))
+	log.Printf("DBG [upload-pack] wants=%d haves=%d", len(wants), len(haves))
 
 	enc := pktline.NewEncoder(proto.w)
 	enc.Encode([]byte("NAK\n"))
@@ -126,7 +126,7 @@ func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore reposi
 	// Update repo refs
 	for _, tx := range txs {
 		if er := repo.Refs.UpdateRef(tx.ref, tx.oldHash, tx.newHash); er != nil {
-			log.Println("[receive-pack] ERR", er)
+			log.Println("ERR [receive-pack]", er)
 			continue
 		}
 		enc.Encode([]byte(fmt.Sprintf("ok %s\n", tx.ref)))
@@ -134,7 +134,7 @@ func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore reposi
 
 	// Store update repo
 	if err = repostore.UpdateRepo(repo); err != nil {
-		log.Println("[receive-pack] ERR Failed to update repo:", err)
+		log.Println("ERR [receive-pack] Failed to update repo:", err)
 	}
 
 	enc.Encode(nil)
@@ -155,7 +155,7 @@ func parseReceivePackClientRefLines(r io.Reader) ([]TxRef, error) {
 
 	txs := make([]TxRef, len(lines))
 	for i, l := range lines {
-		log.Printf("[receive-pack] DBG %s", l)
+		log.Printf("DBG [receive-pack] %s", l)
 
 		rt, err := parseReceiveRefUpdateLine(l)
 		if err != nil {
@@ -204,7 +204,7 @@ func parseUploadPackWantsAndHaves(r io.Reader) (wants, haves []plumbing.Hash, er
 			break
 		}
 
-		log.Printf("[upload-pack] %s", line)
+		log.Printf("DBG [upload-pack] %s", line)
 
 		op := strings.Split(string(line), " ")
 		switch op[0] {

@@ -18,8 +18,10 @@ type RepositoryHead struct {
 
 // RepositoryReferences contains repo refs and head information.
 type RepositoryReferences struct {
-	mu    sync.Mutex
-	head  RepositoryHead
+	mu sync.Mutex `msgpack:"-"`
+	// TODO: Although head is exposed it should be be used directly when setting its
+	// value.  It is only here to until a msgpack marshaller is implemented.
+	Head  RepositoryHead
 	Heads map[string]plumbing.Hash
 	Tags  map[string]plumbing.Hash
 }
@@ -28,16 +30,16 @@ type RepositoryReferences struct {
 // the defaults.
 func NewRepositoryReferences() *RepositoryReferences {
 	return &RepositoryReferences{
-		head:  RepositoryHead{Ref: "heads/master", Hash: plumbing.Hash{}},
+		Head:  RepositoryHead{Ref: "heads/master", Hash: plumbing.Hash{}},
 		Heads: map[string]plumbing.Hash{"master": plumbing.Hash{}},
 		Tags:  map[string]plumbing.Hash{},
 	}
 }
 
 // Head returns the current pointed HEAD
-func (refs *RepositoryReferences) Head() RepositoryHead {
-	return refs.head
-}
+//func (refs *RepositoryReferences) Head() RepositoryHead {
+//	return refs.Head
+//}
 
 // UpdateRef updates a repo reference given the previous hash of the ref.
 func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash) error {
@@ -52,7 +54,13 @@ func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash
 
 		v, ok := refs.Heads[s[1]]
 		if !ok {
-			return fmt.Errorf("ref not found: %s", ref)
+			// Allow to create new branch
+			if !prev.IsZero() {
+				return fmt.Errorf("ref not found: %s", ref)
+			}
+
+			refs.Heads[s[1]] = prev
+			v, _ = refs.Heads[s[1]]
 		}
 
 		if v.String() == prev.String() {
@@ -66,7 +74,13 @@ func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash
 
 		v, ok := refs.Tags[s[1]]
 		if !ok {
-			return fmt.Errorf("ref not found: %s", ref)
+			// Allow to create new tag
+			if !prev.IsZero() {
+				return fmt.Errorf("ref not found: %s", ref)
+			}
+
+			refs.Tags[s[1]] = prev
+			v, _ = refs.Tags[s[1]]
 		}
 
 		if v.String() == prev.String() {
@@ -81,12 +95,12 @@ func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash
 
 	}
 
-	if ref == "refs/"+refs.head.Ref {
-		log.Println("Updating HEAD ref", ref)
-		if refs.head.Hash.String() == prev.String() {
-			refs.head.Hash = curr
+	if ref == "refs/"+refs.Head.Ref {
+		//log.Println("Updating HEAD ref", ref)
+		if refs.Head.Hash.String() == prev.String() {
+			refs.Head.Hash = curr
 		} else {
-			log.Printf("ERR Failed to update head: %s!=%s", refs.head.Hash.String(), prev.String())
+			log.Printf("ERR Failed to update head: %s!=%s", refs.Head.Hash.String(), prev.String())
 		}
 	}
 
@@ -98,8 +112,8 @@ func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash
 func (refs *RepositoryReferences) MarshalJSON() ([]byte, error) {
 	out := map[string]interface{}{
 		"head": map[string]string{
-			"ref":  refs.head.Ref,
-			"hash": refs.head.Hash.String(),
+			"ref":  refs.Head.Ref,
+			"hash": refs.Head.Hash.String(),
 		},
 	}
 	heads := map[string]string{}
@@ -130,13 +144,13 @@ func (refs *RepositoryReferences) SetHead(ref string) (plumbing.Hash, error) {
 	switch tr[0] {
 	case "tags":
 		if h, ok := refs.Tags[tr[1]]; ok {
-			refs.head = RepositoryHead{Hash: h, Ref: ref}
+			refs.Head = RepositoryHead{Hash: h, Ref: ref}
 			return h, nil
 		}
 
 	case "heads":
 		if h, ok := refs.Heads[tr[1]]; ok {
-			refs.head = RepositoryHead{Hash: h, Ref: ref}
+			refs.Head = RepositoryHead{Hash: h, Ref: ref}
 			return h, nil
 		}
 
