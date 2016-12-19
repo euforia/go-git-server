@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -78,6 +79,15 @@ func (refs *RepositoryReferences) UpdateRef(ref string, prev, curr plumbing.Hash
 	default:
 		return fmt.Errorf("invalid ref: %s", ref)
 
+	}
+
+	if ref == "refs/"+refs.head.Ref {
+		log.Println("Updating HEAD ref", ref)
+		if refs.head.Hash.String() == prev.String() {
+			refs.head.Hash = curr
+		} else {
+			log.Printf("ERR Failed to update head: %s!=%s", refs.head.Hash.String(), prev.String())
+		}
 	}
 
 	return nil
