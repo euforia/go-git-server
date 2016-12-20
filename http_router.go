@@ -71,7 +71,7 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Serve starts serving the router handlers
 func (router *Router) Serve(addr string) error {
-	log.Printf("HTTP Server: http://%s", addr)
+	log.Printf("[git] HTTP Server: http://%s", addr)
 	return http.ListenAndServe(addr, router)
 }
 

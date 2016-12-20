@@ -26,7 +26,7 @@ func NewDecoder(rd io.Reader, store storer.EncodedObjectStorer) *Decoder {
 	}
 }
 
-// ReadPackfile from reader and write to object storage
+// Decode from reader and write to object storage
 func (dec *Decoder) Decode() error {
 
 	defer dec.scanner.Close()
@@ -36,7 +36,7 @@ func (dec *Decoder) Decode() error {
 		return err
 	}
 
-	log.Printf("version=%d count=%d", version, objcount)
+	log.Printf("DBG [packfile] version=%d objects=%d", version, objcount)
 
 	for i := 0; i < int(objcount); i++ {
 
