@@ -67,6 +67,7 @@ func (svr *GitHTTPService) ReceivePack(w http.ResponseWriter, r *http.Request) {
 
 	proto := NewProtocol(w, r.Body)
 	proto.ReceivePack(repo, svr.repos, svr.store)
+	// TODO: Call hooks
 }
 
 // UploadPack implements upload-pack protocol over http
