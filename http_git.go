@@ -5,24 +5,22 @@ import (
 	"net/http"
 
 	"github.com/euforia/go-git-server/repository"
-
-	"gopkg.in/src-d/go-git.v4/plumbing/storer"
 )
 
 // GitHTTPService is a git http server
 type GitHTTPService struct {
 	// object store
-	store storer.EncodedObjectStorer
+	stores ObjectStorage
 	// repository store
 	repos repository.RepositoryStore
 }
 
 // NewGitHTTPService instantiates the git http service with the provided repo store
 // and object store.
-func NewGitHTTPService(repostore repository.RepositoryStore, objstore storer.EncodedObjectStorer) *GitHTTPService {
+func NewGitHTTPService(repostore repository.RepositoryStore, objstore ObjectStorage) *GitHTTPService {
 	svr := &GitHTTPService{
-		store: objstore,
-		repos: repostore,
+		stores: objstore,
+		repos:  repostore,
 	}
 
 	return svr
@@ -65,9 +63,10 @@ func (svr *GitHTTPService) ReceivePack(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/x-git-receive-pack-result")
 	w.WriteHeader(200)
 
+	st := svr.stores.GetStore(repoID)
+
 	proto := NewProtocol(w, r.Body)
-	proto.ReceivePack(repo, svr.repos, svr.store)
-	// TODO: Call hooks
+	proto.ReceivePack(repo, svr.repos, st)
 }
 
 // UploadPack implements upload-pack protocol over http
@@ -83,6 +82,8 @@ func (svr *GitHTTPService) UploadPack(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
+	st := svr.stores.GetStore(repoID)
+
 	proto := NewProtocol(w, r.Body)
-	proto.UploadPack(svr.store)
+	proto.UploadPack(st)
 }

@@ -3,8 +3,6 @@ package main
 import (
 	"log"
 
-	"gopkg.in/src-d/go-git.v4/storage/memory"
-
 	"github.com/euforia/go-git-server"
 	"github.com/euforia/go-git-server/repository"
 )
@@ -19,9 +17,9 @@ func init() {
 
 func main() {
 	repostore := repository.NewMemRepoStore()
-	objstore := memory.NewStorage()
+	objstores := gitserver.NewMemObjectStorage()
 
-	gh := gitserver.NewGitHTTPService(repostore, objstore)
+	gh := gitserver.NewGitHTTPService(repostore, objstores)
 	rh := gitserver.NewRepoHTTPService(repostore)
 
 	router := gitserver.NewRouter(gh, rh, nil)
