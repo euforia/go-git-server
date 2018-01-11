@@ -3,8 +3,8 @@ package gitserver
 import (
 	"sync"
 
-	"github.com/src-d/go-git/storage/memory"
 	"gopkg.in/src-d/go-git.v4/plumbing/storer"
+	"gopkg.in/src-d/go-git.v4/storage/memory"
 )
 
 type ObjectStorage interface {
