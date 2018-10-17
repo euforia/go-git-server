@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"strings"
 )
 
 type ctxKey string
@@ -54,17 +53,20 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		if repoID, service, ok := isPackfileRequest(r); ok {
 			ctx := context.WithValue(r.Context(), ctxKeyRepo, repoID)
-			if service == GitServiceRecvPack {
+			switch service {
+			case gitRecvPack:
 				router.git.ReceivePack(w, r.WithContext(ctx))
-			} else {
+			case gitUploadPack:
 				router.git.UploadPack(w, r.WithContext(ctx))
+			default:
+				w.WriteHeader(404)
 			}
 			return
 		}
 
 	}
 
-	repoID := strings.TrimPrefix(r.URL.Path, "/")
+	repoID := r.URL.Path[1:]
 	ctx := context.WithValue(r.Context(), ctxKeyRepo, repoID)
 
 	if isUIRequest(r) && router.ui != nil {

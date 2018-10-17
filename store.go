@@ -66,7 +66,11 @@ func (mos *FilesystemObjectStorage) GetStore(id string) storer.Storer {
 	}
 
 	dir := filepath.Join(mos.datadir, id)
-	os.MkdirAll(dir, 0755)
+	_, err := os.Stat(dir)
+	if err != nil {
+		return nil
+	}
+
 	fs := filesystem.NewStorage(osfs.New(dir), cache.NewObjectLRUDefault())
 	mos.m[id] = fs
 	return fs

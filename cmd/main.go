@@ -21,12 +21,14 @@ func init() {
 func main() {
 	flag.Parse()
 
-	repostore := repository.NewMemRepoStore()
-	// objstores := gitserver.NewMemObjectStorage()
+	repostore := repository.NewFilesystemRepoStore(*dataDir)
+	// repostore := repository.NewMemRepoStore()
+
 	os.MkdirAll(*dataDir, 0755)
 	objstores := gitserver.NewFilesystemObjectStorage(*dataDir)
+	// objstores := gitserver.NewMemObjectStorage()
 
-	gh := gitserver.NewGitHTTPService(repostore, objstores)
+	gh := gitserver.NewGitHTTPService(objstores)
 	rh := gitserver.NewRepoHTTPService(repostore)
 
 	router := gitserver.NewRouter(gh, rh, nil)

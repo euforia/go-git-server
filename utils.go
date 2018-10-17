@@ -6,36 +6,34 @@ import (
 )
 
 func isListRefRequest(r *http.Request) (repo string, service string, ok bool) {
-	ss, ok := r.URL.Query()["service"]
-	if !ok || len(ss) < 1 || (GitServiceType(ss[0]) != GitServiceRecvPack && GitServiceType(ss[0]) != GitServiceUploadPack) {
+	ss := r.URL.Query()["service"]
+	if len(ss) < 1 || (ss[0] != gitRecvPack && ss[0] != gitUploadPack) {
 		return
 	}
 	service = ss[0]
 
-	// not list ref repo info not there
-	if r.URL.Path == "/info/refs" || !strings.HasSuffix(r.URL.Path, "info/refs") {
-		return
+	if strings.HasSuffix(r.URL.Path, "/info/refs") {
+		repo = strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/info/refs"), "/")
+		ok = true
 	}
 
-	repo = strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/info/refs"), "/")
-	ok = true
 	return
 }
 
-func isPackfileRequest(r *http.Request) (repo string, service GitServiceType, ok bool) {
-	if r.URL.Path == "/"+string(GitServiceRecvPack) || r.URL.Path == "/"+string(GitServiceUploadPack) {
+func isPackfileRequest(r *http.Request) (repo string, service string, ok bool) {
+	if r.URL.Path == "/"+gitRecvPack || r.URL.Path == "/"+gitUploadPack {
 		return
 	}
 
 	switch {
-	case strings.HasSuffix(r.URL.Path, "/"+string(GitServiceRecvPack)):
-		repo = strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"+string(GitServiceRecvPack)), "/")
-		service = GitServiceRecvPack
+	case strings.HasSuffix(r.URL.Path, "/"+gitRecvPack):
+		repo = strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"+gitRecvPack), "/")
+		service = gitRecvPack
 		ok = true
 
-	case strings.HasSuffix(r.URL.Path, "/"+string(GitServiceUploadPack)):
-		repo = strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"+string(GitServiceUploadPack)), "/")
-		service = GitServiceUploadPack
+	case strings.HasSuffix(r.URL.Path, "/"+gitUploadPack):
+		repo = strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"+gitUploadPack), "/")
+		service = gitUploadPack
 		ok = true
 	}
 
@@ -44,11 +42,11 @@ func isPackfileRequest(r *http.Request) (repo string, service GitServiceType, ok
 
 func isUIRequest(r *http.Request) bool {
 	agent := r.Header.Get("User-Agent")
-	//log.Printf("%+v", usrAgt)
 	switch {
 	case strings.Contains(agent, "Chrome"),
 		strings.Contains(agent, "Safari"),
-		strings.Contains(agent, "FireFox"):
+		strings.Contains(agent, "FireFox"),
+		strings.Contains(agent, "Mozilla"):
 		return true
 	}
 

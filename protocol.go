@@ -11,17 +11,11 @@ import (
 
 	"github.com/euforia/go-git-server/packfile"
 	"github.com/euforia/go-git-server/pktline"
-	"github.com/euforia/go-git-server/repository"
 )
 
-// GitServiceType can be either receive or upload pack
-type GitServiceType string
-
 const (
-	// GitServiceRecvPack constant for receive-pack
-	GitServiceRecvPack = GitServiceType("git-receive-pack")
-	// GitServiceUploadPack constant for upload-pack
-	GitServiceUploadPack = GitServiceType("git-upload-pack")
+	gitRecvPack   = "git-receive-pack"
+	gitUploadPack = "git-upload-pack"
 )
 
 // Protocol implements the git pack protocol
@@ -35,9 +29,53 @@ func NewProtocol(w io.Writer, r io.Reader) *Protocol {
 	return &Protocol{w: w, r: r}
 }
 
+// // ListReferences writes the references in the pack protocol given the repository
+// // and service type
+// func (proto *Protocol) ListReferences(service GitServiceType, refs *repository.RepositoryReferences) {
+
+// 	// Start sending info
+// 	enc := pktline.NewEncoder(proto.w)
+// 	enc.Encode([]byte(fmt.Sprintf("# service=%s\n", service)))
+// 	enc.Encode(nil)
+
+// 	// Repo empty so send zeros
+// 	if len(refs.Heads) == 0 && len(refs.Tags) == 0 {
+// 		b0 := append([]byte("0000000000000000000000000000000000000000"), 32)
+// 		b0 = append(b0, nullCapabilities()...)
+
+// 		enc.Encode(append(b0, 10))
+// 		enc.Encode(nil)
+// 		return
+// 	}
+
+// 	// Send HEAD info
+// 	head := refs.Head
+
+// 	lh := append([]byte(fmt.Sprintf("%s HEAD", head.Hash.String())), '\x00')
+// 	lh = append(lh, capabilities()...)
+
+// 	if service == GitServiceUploadPack {
+// 		lh = append(lh, []byte(" symref=HEAD:refs/"+head.Ref)...)
+// 	}
+
+// 	enc.Encode(append(lh, 10))
+
+// 	// Send refs - heads
+// 	for href, h := range refs.Heads {
+// 		enc.Encode([]byte(fmt.Sprintf("%s refs/heads/%s\n", h.String(), href)))
+// 	}
+
+// 	// Send refs - tags
+// 	for tref, h := range refs.Tags {
+// 		enc.Encode([]byte(fmt.Sprintf("%s refs/tags/%s\n", h.String(), tref)))
+// 	}
+
+// 	enc.Encode(nil)
+// }
+
 // ListReferences writes the references in the pack protocol given the repository
 // and service type
-func (proto *Protocol) ListReferences(service GitServiceType, refs *repository.RepositoryReferences) {
+func (proto *Protocol) ListReferences(service string, refs []*plumbing.Reference) {
 
 	// Start sending info
 	enc := pktline.NewEncoder(proto.w)
@@ -45,7 +83,7 @@ func (proto *Protocol) ListReferences(service GitServiceType, refs *repository.R
 	enc.Encode(nil)
 
 	// Repo empty so send zeros
-	if (refs.Heads == nil || len(refs.Heads) == 0) && (refs.Tags == nil || len(refs.Tags) == 0) {
+	if len(refs) == 0 {
 		b0 := append([]byte("0000000000000000000000000000000000000000"), 32)
 		b0 = append(b0, nullCapabilities()...)
 
@@ -55,29 +93,19 @@ func (proto *Protocol) ListReferences(service GitServiceType, refs *repository.R
 	}
 
 	// Send HEAD info
-	head := refs.Head
-
-	lh := append([]byte(fmt.Sprintf("%s HEAD", head.Hash.String())), '\x00')
+	lh := append([]byte(fmt.Sprintf("%s %s", refs[0].Hash(), refs[0].Name())), '\x00')
 	lh = append(lh, capabilities()...)
 
-	if service == GitServiceUploadPack {
-		lh = append(lh, []byte(" symref=HEAD:refs/"+head.Ref)...)
+	if service == gitUploadPack {
+		lh = append(lh, []byte(" symref=HEAD:"+refs[0].Name())...)
 	}
 
 	enc.Encode(append(lh, 10))
 
-	// Send refs - heads
-	for href, h := range refs.Heads {
-		enc.Encode([]byte(fmt.Sprintf("%s refs/heads/%s\n", h.String(), href)))
+	for _, ref := range refs[1:] {
+		enc.Encode([]byte(fmt.Sprintf("%s %s\n", ref.Hash(), ref.Name())))
 	}
-
-	// Send refs - tags
-	for tref, h := range refs.Tags {
-		enc.Encode([]byte(fmt.Sprintf("%s refs/tags/%s\n", h.String(), tref)))
-	}
-
 	enc.Encode(nil)
-
 }
 
 // UploadPack implements the git upload pack protocol
@@ -97,7 +125,7 @@ func (proto *Protocol) UploadPack(store storer.EncodedObjectStorer) ([]byte, err
 }
 
 // ReceivePack implements the git receive pack protocol
-func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore repository.RepositoryStore, objstore storer.Storer) error {
+func (proto *Protocol) ReceivePack(objstore storer.Storer) error {
 	enc := pktline.NewEncoder(proto.w)
 
 	txs, err := parseReceivePackClientRefLines(proto.r)
@@ -116,22 +144,11 @@ func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore reposi
 
 	// Update repo refs
 	for _, tx := range txs {
-		// TODO: Remove after fixing repo ref logic
-		if er := repo.Refs.UpdateRef(tx.ref, tx.oldHash, tx.newHash); er != nil {
-			log.Println("ERR [receive-pack] tmp", er)
-		}
-
 		if er := objstore.CheckAndSetReference(tx.New(), tx.Old()); er != nil {
-			// log.Println("ERR [receive-pack]", er)
 			enc.Encode([]byte(fmt.Sprintf("ng %s %v\n", tx.ref, er)))
 		} else {
 			enc.Encode([]byte(fmt.Sprintf("ok %s\n", tx.ref)))
 		}
-	}
-
-	// Store update repo
-	if err = repostore.UpdateRepo(repo); err != nil {
-		log.Println("ERR [receive-pack] Failed to update repo:", err)
 	}
 
 	enc.Encode(nil)

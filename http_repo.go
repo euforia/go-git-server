@@ -25,6 +25,7 @@ func (svr *RepoHTTPService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
+		code = 400
 		err  error
 		repo *repository.Repository
 	)
@@ -40,7 +41,9 @@ func (svr *RepoHTTPService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		repo = repository.NewRepository(repoID)
 		if err = dec.Decode(&repo); err == nil || err == io.EOF {
-			err = svr.repos.CreateRepo(repo)
+			if err = svr.repos.CreateRepo(repo); err == repository.ErrExists {
+				code = 409
+			}
 		}
 
 	case "POST":
@@ -52,7 +55,9 @@ func (svr *RepoHTTPService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if repo, err = svr.repos.GetRepo(repoID); err == nil {
 			// Unmarshal on to existing
 			if err = dec.Decode(repo); err == nil {
-				err = svr.repos.UpdateRepo(repo)
+				if err = svr.repos.UpdateRepo(repo); err == repository.ErrNotFound {
+					code = 404
+				}
 			}
 		}
 	}
@@ -60,7 +65,7 @@ func (svr *RepoHTTPService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
-		w.WriteHeader(400)
+		w.WriteHeader(code)
 		w.Write([]byte(`{"error":"` + err.Error() + `"}`))
 	} else {
 		b, _ := json.Marshal(repo)
