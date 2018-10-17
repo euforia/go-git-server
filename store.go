@@ -15,7 +15,7 @@ import (
 type ObjectStorage interface {
 	// GetStore gets an object store given the id where the id is the namespace
 	// for storage
-	GetStore(string) storer.EncodedObjectStorer
+	GetStore(string) storer.Storer
 }
 
 func NewMemObjectStorage() *MemObjectStorage {
@@ -29,7 +29,7 @@ type MemObjectStorage struct {
 }
 
 // GetStore for the given id.  Create one if it does not exist
-func (mos *MemObjectStorage) GetStore(id string) storer.EncodedObjectStorer {
+func (mos *MemObjectStorage) GetStore(id string) storer.Storer {
 	mos.mu.Lock()
 	defer mos.mu.Unlock()
 
@@ -57,7 +57,7 @@ func NewFilesystemObjectStorage(dir string) *FilesystemObjectStorage {
 }
 
 // GetStore for the given id.  Create one if it does not exist
-func (mos *FilesystemObjectStorage) GetStore(id string) storer.EncodedObjectStorer {
+func (mos *FilesystemObjectStorage) GetStore(id string) storer.Storer {
 	mos.mu.Lock()
 	defer mos.mu.Unlock()
 

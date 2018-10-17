@@ -104,7 +104,7 @@ func (proto *Protocol) UploadPack(store storer.EncodedObjectStorer) ([]byte, err
 }
 
 // ReceivePack implements the git receive pack protocol
-func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore repository.RepositoryStore, objstore storer.EncodedObjectStorer) error {
+func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore repository.RepositoryStore, objstore storer.Storer) error {
 
 	enc := pktline.NewEncoder(proto.w)
 
@@ -125,10 +125,13 @@ func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore reposi
 
 	// Update repo refs
 	for _, tx := range txs {
-		if er := repo.Refs.UpdateRef(tx.ref, tx.oldHash, tx.newHash); er != nil {
+		oldr := plumbing.NewHashReference(plumbing.ReferenceName(tx.ref), tx.oldHash)
+		newr := plumbing.NewHashReference(plumbing.ReferenceName(tx.ref), tx.newHash)
+		if er := objstore.CheckAndSetReference(newr, oldr); er != nil {
 			log.Println("ERR [receive-pack]", er)
 			continue
 		}
+
 		enc.Encode([]byte(fmt.Sprintf("ok %s\n", tx.ref)))
 	}
 
