@@ -18,10 +18,7 @@ func NewRepoHTTPService(store repository.RepositoryStore) *RepoHTTPService {
 }
 
 func (svr *RepoHTTPService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-	repoID := ctx.Value("ID").(string)
-
+	repoID := r.Context().Value(ctxKeyRepo).(string)
 	if !strings.Contains(repoID, "/") {
 		w.WriteHeader(404)
 		return

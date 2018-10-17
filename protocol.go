@@ -24,13 +24,6 @@ const (
 	GitServiceUploadPack = GitServiceType("git-upload-pack")
 )
 
-// TxRef is a transaction to update a repo reference
-type TxRef struct {
-	oldHash plumbing.Hash
-	newHash plumbing.Hash
-	ref     string
-}
-
 // Protocol implements the git pack protocol
 type Protocol struct {
 	w io.Writer
@@ -105,10 +98,8 @@ func (proto *Protocol) UploadPack(store storer.EncodedObjectStorer) ([]byte, err
 
 // ReceivePack implements the git receive pack protocol
 func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore repository.RepositoryStore, objstore storer.Storer) error {
-
 	enc := pktline.NewEncoder(proto.w)
 
-	//var txs []TxRef
 	txs, err := parseReceivePackClientRefLines(proto.r)
 	if err != nil {
 		enc.Encode([]byte(fmt.Sprintf("unpack %v", err)))
@@ -125,14 +116,17 @@ func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore reposi
 
 	// Update repo refs
 	for _, tx := range txs {
-		oldr := plumbing.NewHashReference(plumbing.ReferenceName(tx.ref), tx.oldHash)
-		newr := plumbing.NewHashReference(plumbing.ReferenceName(tx.ref), tx.newHash)
-		if er := objstore.CheckAndSetReference(newr, oldr); er != nil {
-			log.Println("ERR [receive-pack]", er)
-			continue
+		// TODO: Remove after fixing repo ref logic
+		if er := repo.Refs.UpdateRef(tx.ref, tx.oldHash, tx.newHash); er != nil {
+			log.Println("ERR [receive-pack] tmp", er)
 		}
 
-		enc.Encode([]byte(fmt.Sprintf("ok %s\n", tx.ref)))
+		if er := objstore.CheckAndSetReference(tx.New(), tx.Old()); er != nil {
+			// log.Println("ERR [receive-pack]", er)
+			enc.Encode([]byte(fmt.Sprintf("ng %s %v\n", tx.ref, er)))
+		} else {
+			enc.Encode([]byte(fmt.Sprintf("ok %s\n", tx.ref)))
+		}
 	}
 
 	// Store update repo
@@ -145,10 +139,10 @@ func (proto *Protocol) ReceivePack(repo *repository.Repository, repostore reposi
 }
 
 func parseReceivePackClientRefLines(r io.Reader) ([]TxRef, error) {
-
-	dec := pktline.NewDecoder(r)
-
-	var lines [][]byte
+	var (
+		dec   = pktline.NewDecoder(r)
+		lines [][]byte
+	)
 
 	// Read refs from client
 	if err := dec.DecodeUntilFlush(&lines); err != nil {
@@ -160,19 +154,18 @@ func parseReceivePackClientRefLines(r io.Reader) ([]TxRef, error) {
 	for i, l := range lines {
 		log.Printf("DBG [receive-pack] %s", l)
 
-		rt, err := parseReceiveRefUpdateLine(l)
+		rt, err := newTxRefFromBytes(l)
 		if err != nil {
 			return nil, err
 		}
 		txs[i] = rt
-
 	}
 
 	return txs, nil
 }
 
-// Parses old hash, new hash, and ref from a line
-func parseReceiveRefUpdateLine(line []byte) (rt TxRef, err error) {
+// Parses old hash, new hash, and ref from a line in that order
+func newTxRefFromBytes(line []byte) (rt TxRef, err error) {
 	s := string(line)
 	arr := strings.Split(s, " ")
 	if len(arr) < 3 {

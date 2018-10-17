@@ -29,8 +29,8 @@ func NewGitHTTPService(repostore repository.RepositoryStore, objstore ObjectStor
 // ListReferences per the git protocol
 func (svr *GitHTTPService) ListReferences(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	repoID := ctx.Value("ID").(string)
-	service := ctx.Value("service").(string)
+	repoID := ctx.Value(ctxKeyRepo).(string)
+	service := ctx.Value(ctxKeyService).(string)
 
 	repo, err := svr.repos.GetRepo(repoID)
 	if err != nil {
@@ -48,9 +48,7 @@ func (svr *GitHTTPService) ListReferences(w http.ResponseWriter, r *http.Request
 
 // ReceivePack implements the receive-pack protocol over http
 func (svr *GitHTTPService) ReceivePack(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	repoID := ctx.Value("ID").(string)
-
+	repoID := r.Context().Value(ctxKeyRepo).(string)
 	repo, err := svr.repos.GetRepo(repoID)
 	if err != nil {
 		w.WriteHeader(404)
@@ -71,9 +69,7 @@ func (svr *GitHTTPService) ReceivePack(w http.ResponseWriter, r *http.Request) {
 
 // UploadPack implements upload-pack protocol over http
 func (svr *GitHTTPService) UploadPack(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	repoID := ctx.Value("ID").(string)
-
+	repoID := r.Context().Value(ctxKeyRepo).(string)
 	if _, err := svr.repos.GetRepo(repoID); err != nil {
 		w.WriteHeader(404)
 		w.Write([]byte(err.Error()))
