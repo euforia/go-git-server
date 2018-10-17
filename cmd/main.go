@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"os"
 
 	"github.com/euforia/go-git-server"
 	"github.com/euforia/go-git-server/repository"
@@ -9,6 +11,7 @@ import (
 
 var (
 	httpAddr = "127.0.0.1:12345"
+	dataDir  = flag.String("data-dir", "./tmp", "dir")
 )
 
 func init() {
@@ -16,8 +19,12 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
+
 	repostore := repository.NewMemRepoStore()
-	objstores := gitserver.NewMemObjectStorage()
+	// objstores := gitserver.NewMemObjectStorage()
+	os.MkdirAll(*dataDir, 0755)
+	objstores := gitserver.NewFilesystemObjectStorage(*dataDir)
 
 	gh := gitserver.NewGitHTTPService(repostore, objstores)
 	rh := gitserver.NewRepoHTTPService(repostore)
