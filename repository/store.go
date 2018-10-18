@@ -47,6 +47,7 @@ func (mrs *MemRepoStore) CreateRepo(repo *Repository) error {
 	if _, ok := mrs.m[repo.ID]; ok {
 		return ErrExists
 	}
+
 	mrs.m[repo.ID] = repo
 	return nil
 }
